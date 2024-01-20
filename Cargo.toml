@@ -1,0 +1,13 @@
+[package]
+name = "cnctd_midi"
+version = "0.1.0"
+edition = "2021"
+authors = ["Connected Dot Inc.", "Kyle Ebner <kyle@cnctd.world>"]
+description = "APIs to interact with MIDI devices"
+repository = "https://github.com/Connected-Dot/cnctd_midi"
+license = "MIT"
+keywords = ["module"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
