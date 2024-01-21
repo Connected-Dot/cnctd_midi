@@ -5,7 +5,7 @@ use midir::{MidiInput, MidiOutput};
 use anyhow::anyhow;
 // use tune::midi::ChannelMessage;
 
-mod midi_message;
+pub mod midi_message;
 pub struct Midi;
 
 impl Midi {
