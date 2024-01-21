@@ -1,9 +1,11 @@
-use std::{thread::sleep, time::Duration};
+use std::{sync::{mpsc, Arc, Mutex}, thread, time::Duration};
 
+use midi_message::MidiMessage;
 use midir::{MidiInput, MidiOutput};
 use anyhow::anyhow;
-use tune::midi::ChannelMessage;
+// use tune::midi::ChannelMessage;
 
+mod midi_message;
 pub struct Midi;
 
 impl Midi {
@@ -24,27 +26,26 @@ impl Midi {
         Ok((inputs, outputs))
     }
 
-    pub async fn listen_to_device(device: &str) -> anyhow::Result<()> {
+    pub fn listen_to_device(device: &str, tx: mpsc::Sender<MidiMessage>) -> anyhow::Result<()> {
         let midi_input = MidiInput::new("inputs")?;
-        let in_port = Self::find_port(&midi_input, device);
-        match in_port {
-            Some(in_port) => {
-                let _conn_in = midi_input.connect(&in_port, "midir-read-input", 
-                move |_stamp, message, _,| {
-                    match ChannelMessage::from_raw_message(message) {
-                        Some(msg) => println!("midi message: {:?}", msg),
-                        None => println!("no message")
-                    };
-                }, 
-                ());
-                loop {
-                    sleep(Duration::from_secs(10))
+        let in_port = Self::find_port(&midi_input, device).ok_or_else(|| anyhow!("Midi device not connected"))?;
+
+        let tx = Arc::new(Mutex::new(tx)); // Wrap the sender in Arc and Mutex for safe sharing across threads
+
+        let _conn_in = midi_input.connect(&in_port, "midir-read-input", 
+            move |stamp, message, _,| {
+                let tx = tx.clone(); // Clone the Arc to share across threads
+                let message = message.to_owned(); // Clone the message data
+                if let Some(msg) = MidiMessage::from_raw_message(&message, stamp) {
+                    let tx = tx.lock().unwrap();
+                    tx.send(msg).unwrap(); // Send the message through the channel
                 }
-            }
-            None => {
-                println!("no midi connected");
-                Err(anyhow!("Midi device not connected"))
-            }
+            }, 
+            (),
+        );
+
+        loop {
+            thread::sleep(Duration::from_secs(10))
         }
     }
 
@@ -53,8 +54,8 @@ impl Midi {
         for port in midi_io.ports() {
             
             if let Ok(port_name) = midi_io.port_name(&port) {
-                println!("port name: {} | device: {}", port_name, device);
-                if port_name.contains(device.trim_matches('"')) {
+                // println!("port name: {} | device: {}", port_name, device);
+                if port_name.contains(device) {
                     device_port = Some(port);
                     break;
                 }
