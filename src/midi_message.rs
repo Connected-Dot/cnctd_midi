@@ -1,6 +1,6 @@
 use std::time::{self, SystemTime, UNIX_EPOCH};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 const NOTE_OFF: u8 = 0b1000;
 const NOTE_ON: u8 = 0b1001;
@@ -10,14 +10,14 @@ const PROGRAM_CHANGE: u8 = 0b1100;
 const CHANNEL_PRESSURE: u8 = 0b1101;
 const PITCH_BEND_CHANGE: u8 = 0b1110;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct MidiMessage {
     pub channel: u8,
     pub message_type: MidiMessageType,
     pub timestamp: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub enum MidiMessageType {
     NoteOff { key: u8, velocity: u8 },
     NoteOn { key: u8, velocity: u8 },
@@ -73,17 +73,14 @@ impl MidiMessage {
                 pressure: *message.get(1)?,
             },
             PITCH_BEND_CHANGE => MidiMessageType::PitchBendChange {
-                value: i16::from_le_bytes([
-                    *message.get(1)?,
-                    *message.get(2)?,
-                ]),
+                value: i16::from_le_bytes([*message.get(1)?, *message.get(2)?]),
             },
             _ => return None,
         };
         Some(MidiMessage {
             channel,
             message_type,
-            timestamp
+            timestamp,
         })
     }
 
@@ -96,7 +93,8 @@ impl MidiMessage {
             MidiMessageType::ProgramChange { .. } => PROGRAM_CHANGE,
             MidiMessageType::ChannelPressure { .. } => CHANNEL_PRESSURE,
             MidiMessageType::PitchBendChange { .. } => PITCH_BEND_CHANGE,
-        } << 4 | (self.channel & 0b0000_1111);
+        } << 4
+            | (self.channel & 0b0000_1111);
 
         let mut message = vec![status_byte];
         match self.message_type {
@@ -106,7 +104,10 @@ impl MidiMessage {
                 message.push(velocity);
             }
             MidiMessageType::PolyphonicKeyPressure { key, pressure }
-            | MidiMessageType::ControlChange { controller: key, value: pressure } => {
+            | MidiMessageType::ControlChange {
+                controller: key,
+                value: pressure,
+            } => {
                 message.push(key);
                 message.push(pressure);
             }
